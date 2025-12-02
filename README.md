@@ -16,7 +16,7 @@ The soil is continuously monitored. If moisture falls below a configured thresho
 
 🚨⚠️ *Gas Alarm Logic:*
 >
-When the gas sensor detects a harmful concentration level, it starts an interrupt. A buzzer emits a loud signal, a red LED lights up and an alert message appears on the LCD.
+When the gas sensor detects a harmful concentration level, an alarm routine is triggered. A buzzer emits a loud signal, a red LED lights up and an alert message appears on the LCD.
 
 <div align="center">
   <img src="https://github.com/IgorZeitz/TEST/blob/test2/images/schema.png" alt="Schema">
