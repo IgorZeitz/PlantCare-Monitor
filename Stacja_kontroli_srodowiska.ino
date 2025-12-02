@@ -1,7 +1,5 @@
 #include <LiquidCrystal_I2C.h>
 #include "DHT.h"
-#include <avr/io.h>
-#include <avr/interrupt.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); // I2C address 0x27, 16 column and 2 rows
 
@@ -20,13 +18,14 @@ volatile unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50;
 
 // Global vaiables
-volatile bool buttonState = HIGH;
-volatile bool co2Alarm = HIGH;
+volatile bool buttonState;
+volatile bool co2Alarm;
 volatile bool waterState;// = HIGH; // HIGH = plant has enough water
 
 bool prevButtonState;
 int pevTempVal = 0;
 int prevCo2Val = 0;
+int prevHumVal = 0;
 
 DHT dht11(TEMP_SENSOR_PIN, DHT11);
 
@@ -49,11 +48,13 @@ void setup()
 
   // Interrupts
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(CO2_SENSOR_PIN), co2ISR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(CO2_SENSOR_PIN), co2ISR, CHANGE);
+  //attachInterrupt(digitalPinToInterrupt(CO2_SENSOR_PIN), co2ISR, FALLING);
 }
   
 void loop(){
+
+  co2Alarm = digitalRead(CO2_SENSOR_PIN);
+
   if(co2Alarm){ // Check if buzzer ande red diode should be turned on
       analogWrite(BUZZER_PIN, 0);
   } else {
@@ -67,7 +68,7 @@ float co2Read = analogRead(CO2_ANALOG_VALUE_PIN);
   if(buttonState){  // Check what should be displayed on LCD
     tempLCD(temp, hum);
   } else{
-    co2LCD(co2Read);
+    co2LCD(co2Read - 50);
   }
   prevButtonState = buttonState;
 
@@ -81,20 +82,25 @@ float co2PpmConversion(float co2Value){
   //???
 }
 
+unsigned long lastTime = 0;
 void tempLCD(float temperature, float humidity){
-
-  if (temperature != pevTempVal) {
+  unsigned long currentTime = millis();
+  if ((temperature != pevTempVal || humidity != prevHumVal) && currentTime - lastTime > 1000) {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Temp: " + String(temperature));
     lcd.setCursor(0, 1);
     lcd.print("Humidity: " + String(humidity) + "%  ");
     pevTempVal = temperature;
+    prevHumVal = humidity;
+    lastTime = currentTime;
   }
 }
 
+unsigned long lastCo2Time = 0;
 void co2LCD(float co2Concentration){
-  if (co2Concentration != prevCo2Val){
+  unsigned long currentTime = millis();
+  if (co2Concentration != prevCo2Val && currentTime - lastCo2Time > 1000){
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("CO2: " + String(co2Concentration) + "ppm");
@@ -110,21 +116,27 @@ void co2LCD(float co2Concentration){
       lcd.print("Good CO2        "); // print message at (0, 1)
     }
     prevCo2Val = co2Concentration;
+    lastCo2Time = currentTime;
   }
 }
 
 void watering(bool waterState){
   if(waterState){
+    while(waterState){
+    lcd.clear();
     analogWrite(WATER_PUMP_PIN, 0); // Giving 5V on base of pnp transistor, transistor closed
+    waterState = digitalRead(SOIL_SENSOR_PIN);
+    }
   } else {
+    
     analogWrite(WATER_PUMP_PIN, 255); // 0V on base, transistor conducts
   }
 }
 
 // ISR functions
-void co2ISR(){
-  co2Alarm = !co2Alarm;
-}
+//void co2ISR(){
+//  co2Alarm = !co2Alarm;
+//}
 
 void buttonISR(){
   unsigned long currentTime = millis();
